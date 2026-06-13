@@ -19,6 +19,7 @@ CHANNEL="${VOICE_CHANNEL:-0}"
 BRAIN="${VOICE_BRAIN:-claude}"
 VOICE="${VOICE_VOICE:-Emily.wav}"
 SYSTEM="${VOICE_SYSTEM:-$HOME/Nextcloud/robots/maestro/CLAUDE.md}"
+BRAIN_MODEL="${VOICE_BRAIN_MODEL:-}"   # e.g. haiku, sonnet — faster than default
 FACE_SOCK="${VOICE_FACE_SOCK:-${XDG_RUNTIME_DIR:-/tmp}/griot-face.sock}"
 SRT_DIR="${VOICE_SRT_DIR:-$(dirname "$0")/transcripts}"
 # Barge-in on by default (headphones). Set VOICE_NO_BARGE_IN=1 for open speakers.
@@ -30,4 +31,5 @@ exec .venv/bin/python -u converse.py \
   --brain "$BRAIN" --voice "$VOICE" $NOBARGE \
   --face-sock "$FACE_SOCK" --srt-dir "$SRT_DIR" \
   ${SYSTEM:+--system "$SYSTEM"} \
+  ${BRAIN_MODEL:+--brain-model "$BRAIN_MODEL"} \
   "$@"

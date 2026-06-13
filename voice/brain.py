@@ -24,14 +24,21 @@ def echo_brain(text: str) -> Iterator[str]:
     yield f"You said: {text}"
 
 
-def claude_brain(system: str | None = None):
+def claude_brain(system: str | None = None, model: str | None = None):
     """Headless `claude -p`, continuing the conversation across turns.
 
     Streams stdout, yielding complete sentences as they arrive so TTS can start
-    early. Requires the `claude` CLI on PATH.
+    early. Requires the `claude` CLI on PATH. `model` (e.g. "haiku", "sonnet")
+    overrides the default model for a faster conversational pace.
     """
     def run(text: str) -> Iterator[str]:
-        cmd = ["claude", "-p", "--continue", "--output-format", "text"]
+        # --strict-mcp-config: the brain only converses, so skip loading the
+        # user's MCP servers — that cold-start is the main per-turn latency
+        # (seconds, and occasionally 30s+ when a server stalls).
+        cmd = ["claude", "-p", "--continue", "--strict-mcp-config",
+               "--output-format", "text"]
+        if model:
+            cmd += ["--model", model]
         if system:
             cmd += ["--append-system-prompt", system]
         cmd.append(text)
@@ -55,5 +62,5 @@ def claude_brain(system: str | None = None):
 
 BRAINS = {
     "echo": lambda **_: echo_brain,
-    "claude": lambda system=None, **_: claude_brain(system),
+    "claude": lambda system=None, model=None, **_: claude_brain(system, model),
 }

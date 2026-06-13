@@ -15,6 +15,7 @@ Optional companions:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import threading
 from pathlib import Path
@@ -45,6 +46,8 @@ def main():
     ap.add_argument("--voice", default="Emily.wav", help="griot voice file")
     ap.add_argument("--model", default="small.en", help="faster-whisper model")
     ap.add_argument("--system", help="file with a system prompt (claude brain)")
+    ap.add_argument("--brain-model", help="model for the claude brain "
+                    "(e.g. haiku, sonnet) — faster pace than the default")
     ap.add_argument("--device", help="input device (name or index); default=system")
     ap.add_argument("--channel", type=int, default=0,
                     help="which input channel holds the mic (Scarlett XLR = 0)")
@@ -58,10 +61,14 @@ def main():
     ap.add_argument("--greeting", default="I'm listening.")
     args = ap.parse_args()
 
+    # Stop the global cc-speak hook from double-speaking when our claude brain
+    # spawns `claude -p` (its Stop hook would fire too).
+    os.environ["GRIOT_VOICE_LOOP"] = "1"
+
     system = Path(args.system).read_text() if args.system else ""
     if args.brain == "claude":
         system = (system + SPOKEN_STYLE).strip()
-    brain = BRAINS[args.brain](system=system or None)
+    brain = BRAINS[args.brain](system=system or None, model=args.brain_model)
     device = args.device
     if device and device.isdigit():
         device = int(device)

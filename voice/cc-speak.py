@@ -99,6 +99,10 @@ def speak(text: str):
 
 
 def main():
+    # The voice loop's brain spawns `claude -p`, which would fire this same Stop
+    # hook and double-speak. The loop sets GRIOT_VOICE_LOOP so we no-op there.
+    if os.environ.get("GRIOT_VOICE_LOOP"):
+        return 0
     try:
         hook = json.load(sys.stdin)
     except ValueError:
