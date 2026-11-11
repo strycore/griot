@@ -47,9 +47,13 @@ the engine's `temperature` / `exaggeration` / `cfg_weight` / `speed_factor` knob
 your own by copying an entry. The Turbo model also honors paralinguistic tags inline in
 the text: `[laugh]`, `[sigh]`, `[gasp]`, `[cough]`, `[chuckle]`...
 
-Effects (`-e`) post-process the generated wav with sox/ffmpeg before playback: `glados`,
-`claptrap`, `robot`, `ethereal`. Recipes live in the `apply_fx` function in `say.sh`. Presets,
-effects, and voices compose: `./say.sh -p dramatic -e glados -v Gianna.wav "..."`.
+Effects (`-e`) filter the audio through sox/ffmpeg: `glados`, `claptrap`, `robot`,
+`ethereal`. Recipes live in the `fx_pipe` function in `say.sh`. Presets, effects, and
+voices compose: `./say.sh -p dramatic -e glados -v Gianna.wav "..."`.
+
+Audio is streamed: the server synthesizes the text chunk by chunk and say.sh starts
+playing as soon as the first chunk lands, so long texts begin speaking in ~2s instead
+of waiting for the full generation.
 
 ## API
 
