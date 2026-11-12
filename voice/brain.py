@@ -4,16 +4,23 @@ Each brain is a callable taking the transcript and yielding reply text in
 speakable chunks (sentences) so the loop can start talking before the whole
 reply is ready -- and so a barge-in can stop it between chunks.
 
-  echo   -- repeat what was heard; for testing latency and barge-in
-  claude -- the maestro persona via the claude CLI in headless mode
+  echo    -- repeat what was heard; for testing latency and barge-in
+  command -- hand the transcript to any external program and speak its stdout
+
+griot does no inference of its own: `command` is the seam where an assistant
+plugs in. The program gets the transcript as its last argument and prints the
+reply; anything that can do that -- an LLM CLI, an orchestrator, a shell
+script -- can be the voice loop's brain.
 """
 from __future__ import annotations
 
 import re
+import shlex
 import subprocess
+import sys
 from collections.abc import Iterator
 
-_SENT = re.compile(r".+?(?:[.!?]+(?:\s|$)|\n+|$)", re.S)
+_SENT = re.compile(r".+?(?:[.!?]+(?:\s|$)|\n+|$)", re.DOTALL)
 
 
 def split_sentences(text: str) -> list[str]:
@@ -24,43 +31,45 @@ def echo_brain(text: str) -> Iterator[str]:
     yield f"You said: {text}"
 
 
-def claude_brain(system: str | None = None, model: str | None = None):
-    """Headless `claude -p`, continuing the conversation across turns.
+def command_brain(command: str):
+    """Run `command` with the transcript appended as its last argument.
 
-    Streams stdout, yielding complete sentences as they arrive so TTS can start
-    early. Requires the `claude` CLI on PATH. `model` (e.g. "haiku", "sonnet")
-    overrides the default model for a faster conversational pace.
+    Streams the program's stdout, yielding complete sentences as they arrive so
+    TTS can start early. Its stderr passes through to the terminal. If the
+    reply is abandoned mid-way (barge-in), the program is terminated.
     """
+    argv = shlex.split(command)
+    if not argv:
+        raise ValueError("the command brain needs a command (--brain-cmd)")
+
     def run(text: str) -> Iterator[str]:
-        # --strict-mcp-config: the brain only converses, so skip loading the
-        # user's MCP servers — that cold-start is the main per-turn latency
-        # (seconds, and occasionally 30s+ when a server stalls).
-        cmd = ["claude", "-p", "--continue", "--strict-mcp-config",
-               "--output-format", "text"]
-        if model:
-            cmd += ["--model", model]
-        if system:
-            cmd += ["--append-system-prompt", system]
-        cmd.append(text)
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True,
+        proc = subprocess.Popen([*argv, text], stdout=subprocess.PIPE, text=True,
                                 bufsize=1)
         buf = ""
         assert proc.stdout
-        for line in proc.stdout:
-            buf += line
-            sents = split_sentences(buf)
-            # keep the last (possibly incomplete) sentence in the buffer
-            if len(sents) > 1:
-                for s in sents[:-1]:
-                    yield s
-                buf = sents[-1]
-        proc.wait()
-        if buf.strip():
-            yield buf.strip()
+        try:
+            for line in proc.stdout:
+                buf += line
+                sents = split_sentences(buf)
+                # keep the last (possibly incomplete) sentence in the buffer;
+                # the space stands in for the line break split_sentences ate
+                if len(sents) > 1:
+                    yield from sents[:-1]
+                    buf = sents[-1] + " "
+            if buf.strip():
+                yield buf.strip()
+        finally:
+            if proc.poll() is None:
+                proc.terminate()
+            code = proc.wait()
+            # a negative code is our own terminate() after a barge-in
+            if code > 0:
+                print(f"brain command exited with status {code}: {command}",
+                      file=sys.stderr)
     return run
 
 
 BRAINS = {
     "echo": lambda **_: echo_brain,
-    "claude": lambda system=None, model=None, **_: claude_brain(system, model),
+    "command": lambda command="", **_: command_brain(command),
 }

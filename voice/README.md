@@ -20,11 +20,18 @@ to its cache on first run.
 ## Run
 griot must be up (`cd .. && ./run.sh`), then:
 ```sh
-./talk.sh                                   # echo brain: repeats what it hears
-./talk.sh --brain claude --voice Emily.wav  # talk to the maestro persona
-./talk.sh --brain claude --system ~/Nextcloud/robots/maestro/CLAUDE.md
+./talk.sh                                        # echo brain: repeats what it hears
+VOICE_BRAIN_CMD="my-assistant reply" ./talk.sh   # an external program answers
 ```
 Ctrl-C to stop.
+
+## Brain
+griot does no inference. The **brain** is whatever turns a transcript into a reply:
+`echo` (built in, for testing) or `command`, which runs any program you name with the
+transcript appended as its last argument and speaks what it prints, sentence by sentence
+as the output arrives. A leading emoji in the reply sets the face window's expression
+instead of being spoken. That one seam is how an assistant or orchestrator plugs in —
+e.g. [baton](https://github.com/strycore/baton): `VOICE_BRAIN_CMD="baton voice reply"`.
 
 ## Pieces
 - `mic.py` — always-on mic + Silero VAD v6 (onnxruntime). Segments utterances and fires
@@ -32,7 +39,7 @@ Ctrl-C to stop.
 - `stt.py` — faster-whisper wrapper (CPU int8 `small.en`). Run directly to print live
   transcripts.
 - `tts.py` — griot streaming client; `Speaker.speak()` blocks, `Speaker.stop()` cuts in.
-- `brain.py` — pluggable replies: `echo`, `claude` (headless `claude -p --continue`).
+- `brain.py` — pluggable replies: `echo`, `command` (any external program).
 - `converse.py` — the loop. `--no-barge-in` mutes the mic while the bot talks (use on
   open speakers without echo cancellation; closed headset is fine with barge-in on).
 

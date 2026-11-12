@@ -1,7 +1,11 @@
 """Interruptible voice conversation: mic -> STT -> brain -> griot TTS.
 
-  python converse.py --brain echo                 # plumbing/barge-in test
-  python converse.py --brain claude --voice Bishop.wav --system ~/.../maestro/CLAUDE.md
+  python converse.py --brain echo                           # plumbing/barge-in test
+  python converse.py --brain command --brain-cmd "my-assistant reply" --voice Bishop.wav
+
+The brain is whatever answers a transcript. griot ships no assistant: point
+--brain-cmd at a program that takes the transcript as its last argument and
+prints the reply (see brain.py).
 
 Barge-in: a single always-on mic+VAD engine both segments your turns and, the
 instant it hears you start talking while the bot is speaking, cuts the bot off
@@ -15,10 +19,8 @@ Optional companions:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import threading
-from pathlib import Path
 
 import sounddevice as sd
 
@@ -29,14 +31,6 @@ from srt import SrtLog
 from stt import Transcriber
 from tts import Speaker
 
-# Appended to the persona: replies are heard, not read.
-SPOKEN_STYLE = (
-    "\n\nYour replies are spoken aloud through a voice synthesizer and shown as "
-    "subtitles. Keep them short, plain and conversational — usually a sentence or "
-    "two, no markdown or lists. You may begin a reply with a single emoji to set "
-    "your on-screen expression; it is displayed on your face, not spoken."
-)
-BOT_NAME = "maestro"
 IDLE_EMOJI = "🤖"
 
 
@@ -45,9 +39,11 @@ def main():
     ap.add_argument("--brain", default="echo", choices=list(BRAINS))
     ap.add_argument("--voice", default="Emily.wav", help="griot voice file")
     ap.add_argument("--model", default="small.en", help="faster-whisper model")
-    ap.add_argument("--system", help="file with a system prompt (claude brain)")
-    ap.add_argument("--brain-model", help="model for the claude brain "
-                    "(e.g. haiku, sonnet) — faster pace than the default")
+    ap.add_argument("--brain-cmd", help="program for the command brain; the "
+                    "transcript is appended as its last argument and its "
+                    "stdout is spoken")
+    ap.add_argument("--bot-name", default="bot",
+                    help="speaker label for the bot's lines in the .srt log")
     ap.add_argument("--device", help="input device (name or index); default=system")
     ap.add_argument("--channel", type=int, default=0,
                     help="which input channel holds the mic (Scarlett XLR = 0)")
@@ -61,14 +57,9 @@ def main():
     ap.add_argument("--greeting", default="I'm listening.")
     args = ap.parse_args()
 
-    # Stop the global cc-speak hook from double-speaking when our claude brain
-    # spawns `claude -p` (its Stop hook would fire too).
-    os.environ["GRIOT_VOICE_LOOP"] = "1"
-
-    system = Path(args.system).read_text() if args.system else ""
-    if args.brain == "claude":
-        system = (system + SPOKEN_STYLE).strip()
-    brain = BRAINS[args.brain](system=system or None, model=args.brain_model)
+    if args.brain == "command" and not args.brain_cmd:
+        ap.error("--brain command requires --brain-cmd")
+    brain = BRAINS[args.brain](command=args.brain_cmd)
     device = args.device
     if device and device.isdigit():
         device = int(device)
@@ -126,7 +117,7 @@ def main():
     if args.greeting:
         face.saying(args.greeting)
         if srt:
-            srt.add(BOT_NAME, args.greeting)
+            srt.add(args.bot_name, args.greeting)
         say(args.greeting)
 
     try:
@@ -158,7 +149,7 @@ def main():
                 print(f"bot> {clean}")
                 face.saying(clean)
                 if srt:
-                    srt.add(BOT_NAME, clean)
+                    srt.add(args.bot_name, clean)
                 if say(clean):
                     print("  (interrupted)")
                     interrupted = True
