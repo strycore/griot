@@ -1,0 +1,58 @@
+# griot gateway configuration. See README.md.
+
+[server]
+host = "0.0.0.0"
+port = 8004
+default_voice = "emily"
+# Text is synthesized in pieces of about this many characters; the first
+# sentence always goes alone so speech starts quickly.
+chunk_chars = 200
+
+# --- Engines -----------------------------------------------------------------
+# Each table enables one engine. Their order is the order voices are looked up
+# in when two engines offer the same name; `engine:voice` asks one directly.
+
+[engines.chatterbox]
+# A running Chatterbox-TTS-Server (see engines/chatterbox). Its voices are the
+# wav files in its voices/ and reference_audio/ folders, named after the file.
+url = "http://localhost:8005"
+
+[engines.espeak]
+# espeak-ng: robotic but instant, no GPU. Voices are language codes (en-us, fr).
+command = "espeak-ng"
+
+# --- Voice aliases -----------------------------------------------------------
+# Engines list their own voices; add a table here only to give one another name.
+
+[voices.robot]
+engine = "espeak"
+voice = "en-us"
+
+# --- Styles ------------------------------------------------------------------
+# A style is a named delivery. Each engine has its own knobs for it; an engine
+# with no entry for a style speaks plainly.
+
+[styles.calm]
+description = "Even, soothing delivery"
+chatterbox = { temperature = 0.6, exaggeration = 0.3, cfg_weight = 0.5 }
+espeak = { speed = 150, pitch = 40 }
+
+[styles.narrator]
+description = "Warm storyteller, slightly slower"
+chatterbox = { temperature = 0.75, exaggeration = 0.7, cfg_weight = 0.45, speed_factor = 0.95 }
+espeak = { speed = 155 }
+
+[styles.newsreader]
+description = "Crisp and brisk, low drama"
+chatterbox = { temperature = 0.7, exaggeration = 0.4, cfg_weight = 0.6, speed_factor = 1.05 }
+espeak = { speed = 190 }
+
+[styles.dramatic]
+description = "Theatrical, big emotional swings"
+chatterbox = { temperature = 0.85, exaggeration = 1.3, cfg_weight = 0.55 }
+espeak = { speed = 150, pitch = 65 }
+
+[styles.hyped]
+description = "Maximum energy and excitement"
+chatterbox = { temperature = 0.9, exaggeration = 1.5, cfg_weight = 0.6, speed_factor = 1.05 }
+espeak = { speed = 200, pitch = 70 }

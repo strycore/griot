@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Quick "read this aloud" via the local TTS server. Audio is streamed: playback
-# starts as soon as the first text chunk is synthesized, while the rest generates.
+# Quick "read this aloud" via the griot gateway. Audio is streamed: playback
+# starts as soon as the first sentence is synthesized, while the rest generates.
 #   ./say.sh "Hello there, this is my local voice."
-#   ./say.sh -p dramatic "The soufflé has fallen!"   (style preset, see say-presets.json)
+#   ./say.sh -p dramatic "The soufflé has fallen!"   (style, see griot.toml)
 #   ./say.sh -e glados "You will be baked."          (effect: glados|claptrap|robot|ethereal)
-#   ./say.sh -v Gianna.wav "Cloned voice text."      (voice file must be in voices/)
-#   ./say.sh -l                                      (list presets and effects)
-# The Turbo model also honors tags in the text: [laugh] [sigh] [gasp] [cough] ...
+#   ./say.sh -v gianna "Cloned voice text."          (any voice from any engine)
+#   ./say.sh -v robot "No GPU required."             (espeak)
+#   ./say.sh -l                                      (list styles, effects and voices)
+# Chatterbox voices also honor tags in the text: [laugh] [sigh] [gasp] [cough] ...
 set -euo pipefail
-HOST="http://localhost:8004"
-PRESETS="$(dirname "$0")/say-presets.json"
-VOICE="${CHATTERBOX_VOICE:-Emily.wav}"
+HOST="${GRIOT_HOST:-http://localhost:8004}"
+VOICE="${GRIOT_VOICE:-}"   # empty: the gateway's default voice
 PRESET=""
 EFFECT=""
 
@@ -38,30 +38,30 @@ while [ $# -gt 0 ]; do
     -v) VOICE="$2"; shift 2 ;;
     -p) PRESET="$2"; shift 2 ;;
     -e) EFFECT="$2"; shift 2 ;;
-    -l) echo "presets (-p):"
-        jq -r 'to_entries[] | "  \(.key)\t\(.value.description)"' "$PRESETS" | column -ts$'\t'
+    -l) echo "styles (-p):"
+        curl -fsS "$HOST/styles" \
+          | jq -r 'to_entries[] | "  \(.key)\t\(.value.description)\t[\(.value.engines | join(", "))]"' \
+          | column -ts$'\t'
         echo "effects (-e):"
         sed -n 's/^    \([a-z]*\)) *# \(.*\)/  \1\t\2/p' "$0" | column -ts$'\t'
+        echo "voices (-v):"
+        curl -fsS "$HOST/voices" \
+          | jq -r 'group_by(.engine)[] | "  \(.[0].engine)\t\(map(.id) | join(" "))"' \
+          | column -ts$'\t' | fold -s -w 100
         exit 0 ;;
     *) break ;;
   esac
 done
-TEXT="${*:?usage: ./say.sh [-p preset] [-e effect] [-v voice.wav] \"text to speak\"}"
+TEXT="${*:?usage: ./say.sh [-p style] [-e effect] [-v voice] \"text to speak\"}"
 if [ -n "$EFFECT" ] && ! grep -qw "$EFFECT" <<<"$KNOWN_FX"; then
   echo "unknown effect: $EFFECT (try ./say.sh -l)" >&2; exit 1
 fi
-STYLE='{}'
-if [ -n "$PRESET" ]; then
-  STYLE="$(jq -e --arg p "$PRESET" '.[$p] | del(.description)' "$PRESETS")" \
-    || { echo "unknown preset: $PRESET (try ./say.sh -l)" >&2; exit 1; }
-fi
-REQ="$(jq -n --arg t "$TEXT" --arg v "$VOICE" --argjson s "$STYLE" \
-  '{text:$t, voice_mode:"predefined", predefined_voice_id:$v, stream:true} + $s')"
-# aplay underruns while waiting for the first synthesized chunk (the wav header
-# arrives ~2s ahead of any audio) — harmless, so keep its stderr quiet.
+REQ="$(jq -n --arg t "$TEXT" --arg v "$VOICE" --arg s "$PRESET" \
+  '{text:$t} + (if $v != "" then {voice:$v} else {} end)
+             + (if $s != "" then {style:$s} else {} end)')"
+speak() { curl -fsSN "$HOST/speak" -H "Content-Type: application/json" -d "$REQ"; }
 if [ -n "$EFFECT" ]; then
-  curl -fsSN "$HOST/tts" -H "Content-Type: application/json" -d "$REQ" \
-    | fx_pipe "$EFFECT" | aplay -q - 2>/dev/null
+  speak | fx_pipe "$EFFECT" | aplay -q - 2>/dev/null
 else
-  curl -fsSN "$HOST/tts" -H "Content-Type: application/json" -d "$REQ" | aplay -q - 2>/dev/null
-fi
+  speak | aplay -q - 2>/dev/null
+fi || { echo "say.sh: the gateway refused or is down (voices and styles: ./say.sh -l)" >&2; exit 1; }

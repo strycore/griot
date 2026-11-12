@@ -39,6 +39,10 @@ voices/
 temp_audio_outputs/
 model_cache/ # Also good practice to ignore the model cache
 
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+
 # Ignore test reports/coverage
 .coverage
 htmlcov/

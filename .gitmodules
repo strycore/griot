@@ -1,0 +1,3 @@
+[submodule "engines/chatterbox/server"]
+	path = engines/chatterbox/server
+	url = https://github.com/devnen/Chatterbox-TTS-Server

@@ -37,7 +37,8 @@ IDLE_EMOJI = "🤖"
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--brain", default="echo", choices=list(BRAINS))
-    ap.add_argument("--voice", default="Emily.wav", help="griot voice file")
+    ap.add_argument("--voice", help="griot voice (default: the gateway's)")
+    ap.add_argument("--style", help="griot style, e.g. calm (see griot.toml)")
     ap.add_argument("--model", default="small.en", help="faster-whisper model")
     ap.add_argument("--brain-cmd", help="program for the command brain; the "
                     "transcript is appended as its last argument and its "
@@ -69,7 +70,7 @@ def main():
 
     print("loading models...", flush=True)
     stt = Transcriber(model=args.model)
-    speaker = Speaker(voice=args.voice)
+    speaker = Speaker(voice=args.voice, style=args.style)
     mic = Mic(VadConfig(), device=device, channel=args.channel)
 
     # barge-in: VAD onset cuts the bot off. Only act while actually speaking.

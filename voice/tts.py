@@ -1,6 +1,6 @@
-"""Interruptible speech out via griot.
+"""Interruptible speech out via the griot gateway.
 
-Streams griot's /tts WAV into `aplay` so playback starts on the first chunk, and
+Streams the gateway's /speak WAV into `aplay` so playback starts on the first chunk, and
 exposes `stop()` so a barge-in can cut the bot off mid-sentence. `speak()` blocks
 until the line finishes or is interrupted, returning True if it was interrupted.
 """
@@ -15,11 +15,11 @@ HOST = "http://localhost:8004"
 
 
 class Speaker:
-    def __init__(self, voice: str = "Emily.wav", host: str = HOST,
-                 style: dict | None = None):
-        self.voice = voice
+    def __init__(self, voice: str | None = None, host: str = HOST,
+                 style: str | None = None):
+        self.voice = voice    # None: the gateway's default voice
         self.host = host
-        self.style = style or {}
+        self.style = style    # a style name from griot.toml
         self._proc: subprocess.Popen | None = None
         self._resp: requests.Response | None = None
         self._interrupt = threading.Event()
@@ -30,14 +30,17 @@ class Speaker:
         if not text:
             return False
         self._interrupt.clear()
-        req = {"text": text, "voice_mode": "predefined",
-               "predefined_voice_id": self.voice, "stream": True, **self.style}
+        req = {"text": text}
+        if self.voice:
+            req["voice"] = self.voice
+        if self.style:
+            req["style"] = self.style
         with self._lock:
             self._proc = subprocess.Popen(
                 ["aplay", "-q", "-"], stdin=subprocess.PIPE,
                 stderr=subprocess.DEVNULL)
         try:
-            self._resp = requests.post(f"{self.host}/tts", json=req, stream=True,
+            self._resp = requests.post(f"{self.host}/speak", json=req, stream=True,
                                        timeout=(5, 60))
             self._resp.raise_for_status()
             for chunk in self._resp.iter_content(chunk_size=4096):

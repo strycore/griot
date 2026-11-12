@@ -1,85 +1,32 @@
 [project]
 name = "griot"
 version = "0.1.0"
-description = "Local Chatterbox TTS server (ROCm / AMD RX 7800 XT) with zero-shot voice cloning"
-requires-python = "==3.10.*"
+description = "Engine-neutral text-to-speech gateway with a voice loop"
+readme = "README.md"
+requires-python = ">=3.11"
+# The gateway is standard library only, on purpose: it has to run on machines
+# too small for a neural engine. Engines bring their own environments.
+dependencies = []
 
-# Runtime dependencies. This mirrors the upstream requirements-rocm-init.txt +
-# requirements-rocm.txt set, plus the chatterbox engine and two fixes that the
-# upstream pip/--no-deps flow leaves unrecorded (see notes at the bottom).
-dependencies = [
-    # --- PyTorch (ROCm 6.1 wheels — see [tool.uv.sources]) ---
-    "torch==2.5.1",
-    "torchaudio==2.5.1",
-    "torchvision==0.20.1",
-    "pytorch-triton-rocm==3.1.0",
-
-    # --- Chatterbox engine (installed without its own deps — see dependency-metadata) ---
-    "chatterbox-tts",
-    "s3tokenizer==0.3.0",
-    "onnx==1.16.0",
-
-    # --- Chatterbox runtime deps (listed explicitly since chatterbox is dep-stripped) ---
-    "conformer==0.3.2",
-    "diffusers==0.29.0",
-    "transformers==4.46.3",
-    "einops>=0.7.0",
-    "omegaconf==2.3.0",
-    "resampy==0.4.3",
-    "resemble-perth==1.0.1",
-
-    # --- Web framework & server ---
-    "fastapi>=0.100.0,<0.116.0",
-    "uvicorn[standard]>=0.27.0",
-
-    # --- ML & audio ---
-    "numpy>=1.24.0",
-    "soundfile>=0.12.0",
-    "huggingface-hub>=0.20.0",
-    "descript-audio-codec==1.0.0",
-    "safetensors>=0.4.0",
-    "librosa>=0.10.0",
-    "pydub>=0.25.0",
-    "praat-parselmouth>=0.4.0",
-    "hf-transfer>=0.1.4",
-
-    # --- Config & utilities ---
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "jinja2>=3.1.2,<3.2.0",
-    "python-multipart>=0.0.5",
-    "requests>=2.28.0",
-    "pyyaml>=6.0",
-    "tqdm>=4.65.0",
-
-    # --- Fixes not recorded by the upstream --no-deps install ---
-    # perth's watermarker imports pkg_resources at runtime; setuptools>=81 dropped it,
-    # so the Turbo model crashed with "'NoneType' object is not callable" on load.
-    "setuptools<81",
-    # onnx needs protobuf>=3.20.2 for the `builder` module; the bare 3.19 broke imports.
-    "protobuf>=3.20.2,<4",
-]
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.8", "mypy>=1.13"]
 
 [tool.uv]
-# descript-audiotools pins protobuf<3.20 while onnx needs >=3.20.2 — an unsolvable
-# conflict that upstream sidesteps with --no-deps. Override forces our working pin.
-override-dependencies = ["protobuf>=3.20.2,<4"]
+package = false
 
-# Equivalent of `pip install --no-deps chatterbox-tts`: chatterbox declares torch==2.5.1
-# (CPU from PyPI, would clobber the ROCm wheels) plus gradio/spacy/pykakasi the server
-# never uses. Strip its metadata so we control the graph via the explicit deps above.
-[[tool.uv.dependency-metadata]]
-name = "chatterbox-tts"
-requires-dist = []
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
-[[tool.uv.index]]
-name = "pytorch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.1"
-explicit = true
+[tool.ruff]
+line-length = 96
+target-version = "py311"
+# voice/ is a separate component with its own venv (see voice/requirements.txt)
+# and predates this config; it is not linted here yet.
+extend-exclude = ["engines/chatterbox/server", "voice"]
 
-[tool.uv.sources]
-torch = { index = "pytorch-rocm" }
-torchaudio = { index = "pytorch-rocm" }
-torchvision = { index = "pytorch-rocm" }
-pytorch-triton-rocm = { index = "pytorch-rocm" }
-chatterbox-tts = { git = "https://github.com/devnen/chatterbox-v2.git", rev = "master" }
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+files = ["griot"]

@@ -2,10 +2,10 @@
 
 A hands-free conversation layer on top of griot's TTS: **mic → STT → brain → griot TTS**,
 with **barge-in** (talk over the bot and it stops). A lightweight client of the griot
-server — no torch, ~390 MB venv (faster-whisper CPU + onnxruntime VAD).
+gateway — no torch, ~390 MB venv (faster-whisper CPU + onnxruntime VAD).
 
 ```
-mic (16 kHz)  ──▶  Silero VAD  ──▶  faster-whisper  ──▶  brain  ──▶  griot /tts ──▶ aplay
+mic (16 kHz)  ──▶  Silero VAD  ──▶  faster-whisper  ──▶  brain  ──▶  griot /speak ──▶ aplay
    │  (always on)      segments turns     small.en (CPU)    reply       streamed     playback
    └──────────────── onset while bot speaks ⇒ Speaker.stop() (barge-in) ◀───────────────┘
 ```
@@ -18,7 +18,8 @@ The Silero VAD v6 model is vendored in `models/`. faster-whisper downloads `smal
 to its cache on first run.
 
 ## Run
-griot must be up (`cd .. && ./run.sh`), then:
+The griot gateway must be up (`cd .. && ./run.sh`, plus whichever engine your voice
+needs), then:
 ```sh
 ./talk.sh                                        # echo brain: repeats what it hears
 VOICE_BRAIN_CMD="my-assistant reply" ./talk.sh   # an external program answers
