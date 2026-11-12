@@ -23,7 +23,7 @@ fx_pipe() {
       sox -V1 -t wav - -t wav - pitch 550 tempo 1.08 overdrive 6 \
         equalizer 2000 1q 4 highpass 250 lowpass 7000 gain -3 ;;
     robot)    # classic vocoder buzz: flatten all phase information per FFT frame
-      ffmpeg -loglevel error -i - -af \
+      ffmpeg -loglevel error -probesize 32 -analyzeduration 0 -fflags nobuffer -i - -af \
         "afftfilt=real='hypot(re,im)*cos(0)':imag='hypot(re,im)*sin(0)':win_size=512:overlap=0.75" \
         -f wav - ;;
     ethereal) # floaty: shimmer chorus, soft echoes, cathedral reverb
